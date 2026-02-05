@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # PentestAI Interactive CLI
+  pentestai-interactive:
+    container_name: pentestai-interactive
+    build:
+      context: .
+      dockerfile: Dockerfile.pentestai
+    image: pentestai:latest
+    stdin_open: true      # Keep STDIN open (required for interactive)
+    tty: true             # Allocate pseudo-TTY (required for interactive)
+    volumes:
+      # Mount results directory to host
+      - ./pentestai_results:/app/pentestai_results
+      # Mount for custom configs (optional)
+      - ./config:/app/config:ro
+    environment:
+      # OpenAI API Key (set in .env file)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Optional: Custom OpenAI endpoint
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      # Terminal settings
+      - TERM=xterm-256color
+      - PYTHONUNBUFFERED=1
+      # PentestAI settings
+      - PENTESTAI_SANDBOX_MODE=true
+      - PENTESTAI_OUTPUT_DIRECTORY=/app/pentestai_results
+    # Network access for pentesting
+    network_mode: bridge
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+  # PentestAI CLI (non-interactive, for automation)
+  pentestai-cli:
+    container_name: pentestai-cli
+    build:
+      context: .
+      dockerfile: Dockerfile.pentestai
+    image: pentestai:latest
+    volumes:
+      - ./pentestai_results:/app/pentestai_results
+      - ./config:/app/config:ro
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - PENTESTAI_SANDBOX_MODE=true
+    # Override default command for CLI mode
+    command: ["python", "-m", "pentestai.cli", "--help"]
+    profiles:
+      - cli  # Only run when explicitly specified
+
+volumes:
+  pentestai-results:
+    driver: local
