@@ -24,10 +24,13 @@ Based on the academic paper: [PenHeal (arXiv:2407.17788v1)](https://arxiv.org/ht
 ## ✨ Key Features
 
 - **10 Specialized LLM Agents**: 6 for pentesting + 4 for remediation
+- **🆕 Kali Linux MCP Integration**: Real pentest execution with 50+ tools
 - **OpenAI Integration**: GPT-4, GPT-3.5-turbo support
 - **Counterfactual Reasoning**: Explores multiple attack paths
 - **Group Knapsack Optimization**: Maximizes remediation effectiveness
 - **RAG-Based Knowledge**: 15+ built-in pentesting entries
+- **Docker Support**: Fully containerized with MCP orchestration
+- **Interactive CLI**: User-friendly menu-based interface
 - **Sandbox Mode**: Safe simulated execution by default
 
 ## 🚀 Quick Start
@@ -66,9 +69,41 @@ print(f"Strategies: {len(remediation_result.selected_strategies)}")
 # Full assessment
 python -m pentestai.cli --target 192.168.1.100 --mode full --sandbox
 
-# Quick start examples
-python quickstart.py
+# Interactive CLI
+python pentestai_interactive.py
+
+# With Docker and Kali MCP
+docker-compose up
+
+# QuiKALI_MCP_QUICKSTART.md](KALI_MCP_QUICKSTART.md)** - 🆕 Kali MCP quick start (5 min)
+- **[KALI_MCP_INTEGRATION.md](KALI_MCP_INTEGRATION.md)** - 🆕 Complete Kali MCP guide
+- **[DOCKER_QUICKSTART.md](DOCKER_QUICKSTART.md)** - Docker quick reference
+- **[DOCKER_USAGE.md](DOCKER_USAGE.md)** - Complete Docker guide
+- **[PENTESTAI_README.md](PENTESTAI_README.md)** - Framework documentation
+- **[PENTESTAI_SUMMARY.md](PENTESTAI_SUMMARY.md)** - Architecture details
+- **[quickstart.py](quickstart.py)** - Basic usage examples
+- **[example_kali_mcp.py](example_kali_mcp.py)** - 🆕 MCP usage examples
 ```
+
+## 🐉 Kali Linux MCP Integration (NEW!)
+
+Execute **real** penetration testing commands via Kali Linux container:
+
+```bash
+# Start with Kali MCP
+docker-compose up
+
+# Automatic features:
+# ✓ 50+ Kali tools (nmap, sqlmap, nikto, metasploit, hydra...)
+# ✓ Isolated Docker execution
+# ✓ Tool discovery and suggestions
+# ✓ Real-time command execution
+```
+
+**Quick Links:**
+- [KALI_MCP_QUICKSTART.md](KALI_MCP_QUICKSTART.md) - Get started in 5 minutes
+- [KALI_MCP_INTEGRATION.md](KALI_MCP_INTEGRATION.md) - Complete guide
+- [example_kali_mcp.py](example_kali_mcp.py) - Usage examples
 
 ## 📚 Documentation
 

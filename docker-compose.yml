@@ -24,10 +24,15 @@ services:
       - TERM=xterm-256color
       - PYTHONUNBUFFERED=1
       # PentestAI settings
-      - PENTESTAI_SANDBOX_MODE=true
+      - PENTESTAI_SANDBOX_MODE=false
+      - PENTESTAI_USE_MCP=true
+      - KALI_MCP_URL=http://kali-mcp-server:5000
       - PENTESTAI_OUTPUT_DIRECTORY=/app/pentestai_results
-    # Network access for pentesting
-    network_mode: bridge
+    depends_on:
+      kali-mcp-server:
+        condition: service_healthy
+    networks:
+      - pentestai-network
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -54,11 +59,65 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PENTESTAI_SANDBOX_MODE=true
+      - KALI_MCP_URL=http://kali-mcp-server:5000
     # Override default command for CLI mode
     command: ["python", "-m", "pentestai.cli", "--help"]
+    depends_on:
+      kali-mcp-server:
+        condition: service_healthy
+    networks:
+      - pentestai-network
     profiles:
       - cli  # Only run when explicitly specified
 
+  # Kali Linux MCP Server - Full pentesting tools via MCP
+  kali-mcp-server:
+    container_name: kali-mcp-server
+    build:
+      context: .
+      dockerfile: Dockerfile.kali-mcp
+    image: kali-mcp:latest
+    environment:
+      - MCP_SERVER_PORT=5000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount results for command outputs
+      - ./kali_results:/opt/kali-mcp-server/results
+    networks:
+      - pentestai-network
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_ADMIN  # For advanced pentesting operations
+    security_opt:
+      - apparmor:unconfined  # Allow pentesting tools to run
+    ports:
+      - "5000:5000"  # Expose MCP server (official default port)
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health 2>/dev/null || curl http://localhost:5000/ >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+networks:
+  pentestai-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1
+
 volumes:
   pentestai-results:
+    driver: local
+  kali-results:
     driver: local

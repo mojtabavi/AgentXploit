@@ -1,0 +1,49 @@
+# Dockerfile for Official Kali Linux MCP Server
+# Uses official mcp-kali-server package from Kali repositories
+# Package info: https://www.kali.org/tools/mcp-kali-server/
+# GitHub: https://github.com/Wh0am123/MCP-Kali-Server
+
+FROM hub.mirror.mojtabavi.dev/kalilinux/kali-rolling:latest
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV MCP_SERVER_PORT=5000
+ENV PYTHONUNBUFFERED=1
+
+# Update package list and install official mcp-kali-server
+# Package provides two components:
+# - kali-server-mcp: API server that executes terminal commands (default port: 5000)
+# - mcp-server: MCP client bridge that connects to API server
+# Supports tools: nmap, sqlmap, nikto, hydra, john, metasploit, gobuster, dirb, enum4linux, wpscan, etc.
+# Official docs: https://www.kali.org/tools/mcp-kali-server/
+# GitHub: https://github.com/Wh0am123/MCP-Kali-Server
+RUN apt-get update && apt-get install -y \
+    curl \
+    mcp-kali-server \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create working directory
+WORKDIR /opt/kali-mcp-server
+
+# Create results directory for command outputs
+RUN mkdir -p /opt/kali-mcp-server/results
+
+# Create non-root user and set permissions
+RUN useradd -m -s /bin/bash kali || true && \
+    chown -R kali:kali /opt/kali-mcp-server
+
+USER kali
+
+# Health check - verify API server is responsive (accepts any HTTP response)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${MCP_SERVER_PORT}/health 2>/dev/null || curl http://localhost:${MCP_SERVER_PORT}/ >/dev/null 2>&1
+
+# Expose MCP server port (default: 5000)
+EXPOSE ${MCP_SERVER_PORT}
+
+# Start official Kali MCP API Server
+# kali-server-mcp: API server that executes terminal commands
+# Options: --ip <address> (bind address), --port PORT (default: 5000), --debug (verbose logging)
+# Use 0.0.0.0 to accept connections from other Docker containers
+CMD ["kali-server-mcp", "--ip", "0.0.0.0", "--port", "5000"]
