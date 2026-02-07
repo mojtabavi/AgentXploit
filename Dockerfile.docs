@@ -1,0 +1,15 @@
+FROM hub.mirror.mojtabavi.dev/node:18-alpine
+
+WORKDIR /docs
+
+# Install docsify-cli globally
+RUN npm install -g docsify-cli
+
+# Copy documentation files
+COPY . .
+
+# Expose docsify default port
+EXPOSE 3001
+
+# Start docsify server
+CMD ["docsify", "serve", ".", "--port", "3001"]

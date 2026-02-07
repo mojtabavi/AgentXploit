@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Results and logs
+pentestai_results/
+kali_results/
+*.log
+
+# Documentation
+*.md
+docs/
+legacy/
+benchmark/
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# Node modules (exclude from Python images)
+node_modules/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+
+# Config examples
+.env.example
+*.example

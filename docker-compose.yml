@@ -1,42 +1,65 @@
-version: '3.8'
-
 services:
-  # PentestAI Interactive CLI
-  pentestai-interactive:
-    container_name: pentestai-interactive
+  # React UI (Frontend)
+  pentestai-react-ui:
+    container_name: pentestai-react-ui
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    image: pentestai-ui:latest
+    ports:
+      - "3000:3000"  # React UI
+    volumes:
+      - ./ui:/app
+      - /app/node_modules
+    command: ["sh", "-lc", "bun install && bun run dev --host 0.0.0.0"]
+    environment:
+      - VITE_DEV_PROXY_TARGET=http://pentestai-api:8000
+    networks:
+      - pentestai-network
+    depends_on:
+      - pentestai-api
+
+  # Documentation UI (Docsify)
+  pentestai-docs:
+    container_name: pentestai-docs
+    build:
+      context: ./docs
+      dockerfile: ../Dockerfile.docs
+    image: pentestai-docs:latest
+    ports:
+      - "3001:3001"  # Documentation
+    volumes:
+      - ./docs:/docs
+    networks:
+      - pentestai-network
+    restart: unless-stopped
+
+  # API Server (Backend)
+  pentestai-api:
+    container_name: pentestai-api
     build:
       context: .
-      dockerfile: Dockerfile.pentestai
-    image: pentestai:latest
-    stdin_open: true      # Keep STDIN open (required for interactive)
-    tty: true             # Allocate pseudo-TTY (required for interactive)
+      dockerfile: Dockerfile.api
+    image: pentestai-api:latest
+    ports:
+      - "8000:8000"  # FastAPI
     volumes:
-      # Mount results directory to host
       - ./pentestai_results:/app/pentestai_results
-      # Mount for custom configs (optional)
-      - ./config:/app/config:ro
     environment:
-      # OpenAI API Key (set in .env file)
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # Optional: Custom OpenAI endpoint
+      # API Keys - Set in .env file
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
-      # Terminal settings
-      - TERM=xterm-256color
-      - PYTHONUNBUFFERED=1
-      # PentestAI settings
-      - PENTESTAI_SANDBOX_MODE=false
-      - PENTESTAI_USE_MCP=true
+      - ARVANCLOUD_API_KEY=${ARVANCLOUD_API_KEY:-}
+      - ARVANCLOUD_ENDPOINT=${ARVANCLOUD_ENDPOINT:-}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4}
+      # Kali MCP URL (bridge network)
       - KALI_MCP_URL=http://kali-mcp-server:5000
-      - PENTESTAI_OUTPUT_DIRECTORY=/app/pentestai_results
+      - PYTHONUNBUFFERED=1
     depends_on:
       kali-mcp-server:
         condition: service_healthy
     networks:
       - pentestai-network
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    # Resource limits
     deploy:
       resources:
         limits:
@@ -46,53 +69,27 @@ services:
           cpus: '1'
           memory: 2G
 
-  # PentestAI CLI (non-interactive, for automation)
-  pentestai-cli:
-    container_name: pentestai-cli
-    build:
-      context: .
-      dockerfile: Dockerfile.pentestai
-    image: pentestai:latest
-    volumes:
-      - ./pentestai_results:/app/pentestai_results
-      - ./config:/app/config:ro
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - PENTESTAI_SANDBOX_MODE=true
-      - KALI_MCP_URL=http://kali-mcp-server:5000
-    # Override default command for CLI mode
-    command: ["python", "-m", "pentestai.cli", "--help"]
-    depends_on:
-      kali-mcp-server:
-        condition: service_healthy
-    networks:
-      - pentestai-network
-    profiles:
-      - cli  # Only run when explicitly specified
-
-  # Kali Linux MCP Server - Full pentesting tools via MCP
+  # Kali Linux MCP Server - With HOST network access
   kali-mcp-server:
     container_name: kali-mcp-server
     build:
       context: .
       dockerfile: Dockerfile.kali-mcp
     image: kali-mcp:latest
+    ports:
+      - "5000:5000"  # MCP server
     environment:
       - MCP_SERVER_PORT=5000
       - PYTHONUNBUFFERED=1
     volumes:
       # Mount results for command outputs
       - ./kali_results:/opt/kali-mcp-server/results
-    networks:
-      - pentestai-network
     cap_add:
       - NET_ADMIN
       - NET_RAW
       - SYS_ADMIN  # For advanced pentesting operations
     security_opt:
       - apparmor:unconfined  # Allow pentesting tools to run
-    ports:
-      - "5000:5000"  # Expose MCP server (official default port)
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health 2>/dev/null || curl http://localhost:5000/ >/dev/null 2>&1"]
       interval: 30s
@@ -107,11 +104,15 @@ services:
         reservations:
           cpus: '2'
           memory: 4G
+    networks:
+      - pentestai-network
 
+# Custom network for non-host services
 networks:
   pentestai-network:
     driver: bridge
     ipam:
+      driver: default
       config:
         - subnet: 172.30.0.0/24
           gateway: 172.30.0.1

@@ -113,10 +113,18 @@ workspace/*
 # Logs
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Environment
 .env
 .env.auth
+.env.*
+!.env.example
+!.env.template
+!.env.sample
 
 # Agent runs
 agent_runs/
@@ -149,3 +157,28 @@ docs/_build/
 .ipynb_checkpoints
 profile_default/
 ipython_config.py
+
+# ============================================================================
+# Node / Vite (UI)
+# ============================================================================
+
+node_modules/
+.npm/
+.yarn/
+.pnp/
+.pnp.js
+.pnpm-store/
+.vite/
+dist/
+build/
+*.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# ============================================================================
+# Generated results / artifacts
+# ============================================================================
+
+kali_results/
+pentestai_results/
+benchmark/standalone-xbow-benchmark-runner/results/

@@ -1,0 +1,286 @@
+import { useState, useEffect, useRef } from 'react'
+import { marked } from 'marked'
+import { markedHighlight } from 'marked-highlight'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
+import './App.css'
+
+// Configure marked for syntax highlighting
+marked.use(markedHighlight({
+  langPrefix: 'hljs language-',
+  highlight(code, lang) {
+    const language = hljs.getLanguage(lang) ? lang : 'plaintext'
+    return hljs.highlight(code, { language }).value
+  }
+}))
+
+function App() {
+  const [connected, setConnected] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [userInput, setUserInput] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingMessage, setStreamingMessage] = useState('')
+  const messagesEndRef = useRef(null)
+  const inputRef = useRef(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, streamingMessage])
+
+  useEffect(() => {
+    checkConnection()
+    // Retry connection every 5 seconds if not connected
+    const interval = setInterval(() => {
+      if (!connected) {
+        checkConnection()
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [connected])
+
+  const checkConnection = async () => {
+    try {
+      const response = await fetch('/api/health')
+      const data = await response.json()
+      setConnected(data.llm_connected)
+    } catch (error) {
+      setConnected(false)
+    }
+  }
+
+  const sendMessage = async () => {
+    const message = userInput.trim()
+    if (!message || isStreaming) return
+
+    if (!connected) {
+      setMessages(prev => [...prev, {
+        role: 'system',
+        content: '❌ Cannot send message: System not connected',
+        timestamp: Date.now()
+      }])
+      return
+    }
+
+    // Add user message
+    setMessages(prev => [...prev, {
+      role: 'user',
+      content: message,
+      timestamp: Date.now()
+    }])
+    setUserInput('')
+    setIsStreaming(true)
+    setStreamingMessage('')
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message,
+          history: messages.map(m => ({ role: m.role, content: m.content }))
+        })
+      })
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullMessage = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') {
+              if (fullMessage) {
+                setMessages(prev => [...prev, {
+                  role: 'assistant',
+                  content: fullMessage,
+                  timestamp: Date.now()
+                }])
+              }
+              setStreamingMessage('')
+              setIsStreaming(false)
+            } else {
+              try {
+                const json = JSON.parse(data)
+                if (json.content) {
+                  fullMessage += json.content
+                  setStreamingMessage(fullMessage)
+                }
+              } catch (e) {
+                console.error('Parse error:', e)
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      setMessages(prev => [...prev, {
+        role: 'system',
+        content: `❌ Error: ${error.message}`,
+        timestamp: Date.now()
+      }])
+      setIsStreaming(false)
+    }
+  }
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  const handleStarterClick = (prompt) => {
+    setUserInput(prompt)
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className="app">
+      {/* Header inspired by HackerAI */}
+      <header className="header">
+        <div className="header-content">
+          <div className="logo">
+            <span className="logo-text">PentestAI</span>
+          </div>
+          <nav className="nav-links">
+            <a href="#" className="nav-link">Documentation</a>
+            <a href="#" className="nav-link">About</a>
+            <div className={`status-badge ${connected ? 'connected' : 'disconnected'}`}>
+              <span className="status-dot"></span>
+              {connected ? 'Connected' : 'Disconnected'}
+            </div>
+          </nav>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <div className="hero-section">
+        <h1 className="hero-title">PentestAI</h1>
+        <p className="hero-subtitle">Your AI pentest assistant</p>
+      </div>
+
+      {/* Chat Interface */}
+      <div className="chat-wrapper">
+        <div className="chat-container">
+          {connected ? (
+            <>
+              {messages.length === 0 && !streamingMessage && (
+                <div className="conversation-starters">
+                  <div className="starters-title">Get started with:</div>
+                  <div className="starters-grid">
+                    <button 
+                      className="starter-btn"
+                      onClick={() => handleStarterClick('Scan 192.168.1.100 for vulnerabilities')}
+                    >
+                      🔍 Scan 192.168.1.100 for vulnerabilities
+                    </button>
+                    <button 
+                      className="starter-btn"
+                      onClick={() => handleStarterClick('Run a full pentest on my web server')}
+                    >
+                      🛡️ Run a full pentest on my web server
+                    </button>
+                    <button 
+                      className="starter-btn"
+                      onClick={() => handleStarterClick('Check for open ports on 10.0.0.5')}
+                    >
+                      🔓 Check for open ports on 10.0.0.5
+                    </button>
+                    <button 
+                      className="starter-btn"
+                      onClick={() => handleStarterClick('Scan my network 192.168.1.0/24')}
+                    >
+                      🌐 Scan my network 192.168.1.0/24
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="messages-container">
+                {messages.map((msg, i) => (
+                  <div key={i} className={`message ${msg.role}`}>
+                    <div className="message-avatar">
+                      {msg.role === 'user' ? '👤' : msg.role === 'assistant' ? '🤖' : '⚙️'}
+                    </div>
+                    <div className="message-content">
+                      <MessageContent content={msg.content} />
+                    </div>
+                  </div>
+                ))}
+                
+                {streamingMessage && (
+                  <div className="message assistant streaming">
+                    <div className="message-avatar">🤖</div>
+                    <div className="message-content">
+                      <MessageContent content={streamingMessage} />
+                      <span className="cursor">▊</span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="chat-input-area">
+                <textarea
+                  ref={inputRef}
+                  className="chat-input"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Ask your pentesting question..."
+                  disabled={isStreaming}
+                  rows={1}
+                />
+                <button
+                  className="send-button"
+                  onClick={sendMessage}
+                  disabled={!userInput.trim() || isStreaming}
+                >
+                  {isStreaming ? '⏳' : '↑'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="connecting-state">
+              <div className="spinner"></div>
+              <p>Connecting to PentestAI...</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <div className="footer-content">
+          <p>By using PentestAI, you agree to our <a href="#terms">Terms of Service</a> and <a href="#privacy">Privacy Policy</a></p>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+// Component to render markdown content
+function MessageContent({ content }) {
+  const html = marked.parse(content)
+  return (
+    <div 
+      className="markdown-content"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+}
+
+export default App
